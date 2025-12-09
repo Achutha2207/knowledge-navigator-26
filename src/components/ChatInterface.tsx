@@ -48,35 +48,58 @@ const ChatInterface = () => {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+      
+      // Build chat history from previous messages (excluding the welcome message)
+      const history = messages
+        .filter((m) => m.id !== "1")
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const response = await fetch(`${apiBaseUrl}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          history,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Based on your question "${input}", here's what I found in the knowledge base. This is a simulated response demonstrating the RAG system's capabilities.`,
+        content: data.reply,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        confidence: 0.87,
-        sources: [
-          {
-            title: "Technical Documentation - Chapter 3",
-            snippet: "Relevant information extracted from the document...",
-          },
-          {
-            title: "FAQ Section - Authentication",
-            snippet: "Common questions and answers about the topic...",
-          },
-          {
-            title: "API Reference Guide",
-            snippet: "Detailed API specifications and examples...",
-          },
-        ],
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to get response from server");
+      
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Sorry, I couldn't connect to the backend. Please make sure the server is running at the configured API URL.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   const handleFileUpload = () => {
@@ -120,7 +143,7 @@ const ChatInterface = () => {
                   <span className="w-2 h-2 bg-primary rounded-full"></span>
                   <span className="w-2 h-2 bg-primary rounded-full"></span>
                 </div>
-                <span className="text-sm text-muted-foreground">Analyzing documents...</span>
+                <span className="text-sm text-muted-foreground">Thinking...</span>
               </div>
             </div>
           </div>

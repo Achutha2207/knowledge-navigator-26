@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Environment variables
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-MODEL_NAME = os.getenv("MODEL_NAME", "mistral")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 # Initialize FastAPI app
@@ -34,10 +34,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# Configure CORS - allow frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "*"  # Allow all for flexibility
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,21 +50,18 @@ app.add_middleware(
 
 
 # Pydantic models
-class ChatMessage(BaseModel):
+class ChatHistoryItem(BaseModel):
     role: str
     content: str
 
 
 class ChatRequest(BaseModel):
-    question: str
-    chat_history: Optional[List[ChatMessage]] = []
+    message: str
+    history: Optional[List[ChatHistoryItem]] = []
 
 
 class ChatResponse(BaseModel):
-    status: str
-    answer: str
-    model: str
-    tokens_used: int
+    reply: str
 
 
 class HealthResponse(BaseModel):
@@ -79,7 +81,7 @@ async def health_check():
     logger.info("Health check requested")
     return HealthResponse(
         status="Backend is running",
-        model=MODEL_NAME,
+        model=OLLAMA_MODEL,
         ollama_url=OLLAMA_BASE_URL
     )
 
@@ -122,33 +124,39 @@ async def get_models():
         )
 
 
-# Chat endpoint
+# Chat endpoint - main API for frontend
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Send a question to Ollama and get a response.
+    Send a message to Ollama and get a response.
     Supports chat history for context.
     """
     try:
-        logger.info(f"Chat request received: {request.question[:50]}...")
+        logger.info(f"Chat request received: {request.message[:50]}...")
         
-        # Build the prompt with chat history
-        prompt = ""
-        for msg in request.chat_history:
-            if msg.role == "user":
-                prompt += f"User: {msg.content}\n"
-            elif msg.role == "assistant":
-                prompt += f"Assistant: {msg.content}\n"
+        # Build messages array for Ollama chat API
+        messages = []
         
-        prompt += f"User: {request.question}\nAssistant:"
+        # Add chat history
+        for msg in request.history or []:
+            messages.append({
+                "role": msg.role,
+                "content": msg.content
+            })
         
-        # Call Ollama API
-        logger.info(f"Calling Ollama at {OLLAMA_BASE_URL}/api/generate")
+        # Add current user message
+        messages.append({
+            "role": "user",
+            "content": request.message
+        })
+        
+        # Call Ollama Chat API
+        logger.info(f"Calling Ollama at {OLLAMA_BASE_URL}/api/chat with model {OLLAMA_MODEL}")
         response = requests.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
+            f"{OLLAMA_BASE_URL}/api/chat",
             json={
-                "model": MODEL_NAME,
-                "prompt": prompt,
+                "model": OLLAMA_MODEL,
+                "messages": messages,
                 "stream": False
             },
             timeout=120
@@ -156,23 +164,20 @@ async def chat(request: ChatRequest):
         response.raise_for_status()
         
         data = response.json()
-        answer = data.get("response", "").strip()
-        tokens_used = data.get("eval_count", 0) + data.get("prompt_eval_count", 0)
+        reply = data.get("message", {}).get("content", "").strip()
         
-        logger.info(f"Successfully generated response with {tokens_used} tokens")
+        if not reply:
+            reply = "I received your message but couldn't generate a response."
         
-        return ChatResponse(
-            status="success",
-            answer=answer,
-            model=MODEL_NAME,
-            tokens_used=tokens_used
-        )
+        logger.info(f"Successfully generated response ({len(reply)} chars)")
+        
+        return ChatResponse(reply=reply)
     
     except requests.exceptions.ConnectionError as e:
         logger.error(f"Connection error to Ollama: {str(e)}")
         raise HTTPException(
             status_code=503,
-            detail="Cannot connect to Ollama. Please ensure Ollama is running."
+            detail="Cannot connect to Ollama. Please ensure Ollama is running on localhost:11434."
         )
     except requests.exceptions.Timeout as e:
         logger.error(f"Timeout connecting to Ollama: {str(e)}")

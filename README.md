@@ -54,11 +54,60 @@ npm run dev
 
 This project is built with:
 
+**Frontend:**
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+
+**Backend:**
+- FastAPI (Python)
+- Ollama (Local LLM)
+
+## How to Run (Full Stack)
+
+### 1. Start Ollama
+
+```bash
+# Pull the model (first time only)
+ollama pull llama3.1
+
+# Make sure Ollama server is running
+ollama serve
+```
+
+### 2. Start the Backend
+
+```bash
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the backend server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 3. Start the Frontend
+
+```bash
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+### 4. Test the Chat
+
+1. Open http://localhost:5173 in your browser
+2. Type a question like "Hello, who are you?"
+3. You should see a response from the Ollama model
+
+See `backend-README.md` for detailed backend documentation.
 
 ## How can I deploy this project?
 
