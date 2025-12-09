@@ -54,11 +54,6 @@ const ChatInterface = () => {
 
     try {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-      
-      // Build chat history from previous messages (excluding the welcome message)
-      const history = messages
-        .filter((m) => m.id !== "1")
-        .map((m) => ({ role: m.role, content: m.content }));
 
       const response = await fetch(`${apiBaseUrl}/api/chat`, {
         method: "POST",
@@ -66,22 +61,21 @@ const ChatInterface = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: currentInput,
-          history,
+          question: currentInput,
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Request failed with status ${response.status}`);
-      }
-
       const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = data.detail?.message || data.message || `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.reply,
+        content: data.answer,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -93,7 +87,7 @@ const ChatInterface = () => {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Sorry, I couldn't connect to the backend. Please make sure the server is running at the configured API URL.",
+        content: `Backend error: ${error instanceof Error ? error.message : "Please try again later."}`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, errorMessage]);
