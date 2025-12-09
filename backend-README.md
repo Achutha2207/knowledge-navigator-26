@@ -1,59 +1,36 @@
 # RAG Knowledge Assistant - Backend
 
-FastAPI backend for the Private RAG Knowledge Assistant that connects to Ollama for LLM inference.
+FastAPI backend using Hugging Face Inference API for LLM responses.
 
-## Prerequisites
+## Quick Start
 
-- Python 3.9+
-- [Ollama](https://ollama.ai/) installed and running
-- A model pulled in Ollama (e.g., `ollama pull mistral`)
+### 1. Get a Hugging Face API Token
 
-## Setup
+1. Create a free account at [huggingface.co](https://huggingface.co)
+2. Go to [Settings > Access Tokens](https://huggingface.co/settings/tokens)
+3. Create a new token (read access is sufficient)
 
-### 1. Create Virtual Environment
-
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-### 2. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configure Environment Variables
-
-Copy the example environment file and modify as needed:
+### 2. Configure Environment
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your configuration:
-- `OLLAMA_BASE_URL`: URL where Ollama is running (default: http://localhost:11434)
-- `MODEL_NAME`: The Ollama model to use (default: mistral)
-- `ENVIRONMENT`: development, staging, or production
-
-### 4. Start Ollama
-
-Make sure Ollama is running:
-
-```bash
-ollama serve
+Edit `.env` and add your token:
+```
+HF_API_TOKEN=hf_your_actual_token_here
 ```
 
-Pull the model if you haven't already:
+### 3. Install Dependencies
 
 ```bash
-ollama pull mistral
+pip install -r requirements.txt
 ```
 
-### 5. Run the Backend
+### 4. Run the Backend
 
 ```bash
-uvicorn main:app --reload --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at `http://localhost:8000`
@@ -61,115 +38,37 @@ The API will be available at `http://localhost:8000`
 ## API Endpoints
 
 ### Health Check
-
 ```
 GET /
-```
-
-Returns backend status, model name, and Ollama URL.
-
-**Response:**
-```json
-{
-  "status": "Backend is running",
-  "model": "mistral",
-  "ollama_url": "http://localhost:11434"
-}
-```
-
-### List Available Models
-
-```
-GET /api/models
-```
-
-Returns list of models available in Ollama.
-
-**Response:**
-```json
-{
-  "models": ["mistral:latest", "llama2:latest"]
-}
+Response: { "status": "backend_running" }
 ```
 
 ### Chat
-
 ```
 POST /api/chat
+Body: { "question": "Your question here" }
+Response: { "status": "success", "question": "...", "answer": "..." }
 ```
 
-Send a question and receive an AI-generated response.
-
-**Request Body:**
-```json
-{
-  "question": "What is machine learning?",
-  "chat_history": [
-    {"role": "user", "content": "Hello"},
-    {"role": "assistant", "content": "Hi! How can I help you?"}
-  ]
-}
+### List Models
+```
+GET /api/models
+Response: { "models": [...], "current": "..." }
 ```
 
-**Response:**
-```json
-{
-  "status": "success",
-  "answer": "Machine learning is a subset of artificial intelligence...",
-  "model": "mistral",
-  "tokens_used": 150
-}
-```
+## Deployment
 
-## Error Handling
+### Render / Railway / Heroku
 
-The API returns appropriate HTTP status codes:
-
-- `200`: Success
-- `500`: Internal server error
-- `502`: Bad gateway (Ollama error)
-- `503`: Service unavailable (Cannot connect to Ollama)
-- `504`: Gateway timeout (Ollama request timed out)
-
-## API Documentation
-
-Once running, visit:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## Production Deployment
-
-The `Procfile` is configured for deployment to platforms like Heroku or Railway:
-
+The `Procfile` is already configured:
 ```
 web: uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
-## Project Structure
+Set the `HF_API_TOKEN` environment variable in your deployment platform.
 
-```
-├── main.py              # FastAPI application
-├── requirements.txt     # Python dependencies
-├── .env                 # Environment variables (git-ignored)
-├── .env.example         # Example environment variables
-├── Procfile            # Production deployment config
-└── backend-README.md   # This file
-```
+### Frontend Connection
 
-## Connecting Frontend
+The frontend expects the backend at `VITE_API_BASE_URL` (defaults to `http://localhost:8000`).
 
-Update your React frontend to point to this backend:
-
-```typescript
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-const response = await fetch(`${API_URL}/api/chat`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ question, chat_history })
-});
-```
-
-## License
-
-MIT
+For production, set `VITE_API_BASE_URL` to your deployed backend URL.
